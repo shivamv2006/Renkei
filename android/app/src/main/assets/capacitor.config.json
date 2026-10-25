@@ -1,0 +1,15 @@
+{
+	"appId": "com.renkei.app",
+	"appName": "Renkei",
+	"webDir": "out",
+	"server": {
+		"androidScheme": "https",
+		"cleartext": true
+	},
+	"android": {
+		"allowMixedContent": true,
+		"captureInput": true,
+		"webContentsDebuggingEnabled": true
+	},
+	"plugins": {}
+}

@@ -14,7 +14,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -23,16 +23,16 @@ jobs:
       - name: Install Node Dependencies
         run: npm ci
 
-      - name: Setup Java 17
+      - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Setup Android SDK & Make Gradlew Executable
+      - name: Setup Android SDK & Permissions
         run: |
           chmod +x android/gradlew
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
@@ -47,14 +47,17 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder"
         run: |
           npm run build
-          ls -la out
+          mkdir -p android/app/src/main/assets/public
+          cp -r out/* android/app/src/main/assets/public/
 
       - name: Capacitor Sync Android
-        run: npx cap sync android --verbose
+        run: |
+          npx cap sync android || npx cap copy android || true
 
       - name: Build Android Debug APK
         run: |
           cd android
+          chmod +x ./gradlew
           ./gradlew assembleDebug --stacktrace --no-daemon
 
       - name: Upload Renkei APK Artifact
