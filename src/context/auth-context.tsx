@@ -11,6 +11,7 @@ interface AuthContextType {
   isLoading: boolean;
   isDemoMode: boolean;
   loginWithEmail: (email: string, password: string) => Promise<{ error?: string }>;
+  loginWithGoogle: () => Promise<{ error?: string }>;
   signupWithEmail: (
     email: string,
     password: string,
@@ -158,6 +159,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
+    });
+
+    if (error) return { error: error.message };
+    return {};
+  };
+
+  const loginWithGoogle = async () => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      return { error: 'Supabase credentials are not configured.' };
+    }
+
+    const redirectUrl = typeof window !== 'undefined'
+      ? (window.location.origin.includes('localhost') && !window.location.origin.includes(':3000')
+          ? 'https://localhost'
+          : `${window.location.origin}`)
+      : undefined;
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
     });
 
     if (error) return { error: error.message };
@@ -334,6 +362,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isDemoMode,
         loginWithEmail,
+        loginWithGoogle,
         signupWithEmail,
         resetPasswordEmail,
         updateUserPassword,
