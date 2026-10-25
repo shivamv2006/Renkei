@@ -7,6 +7,7 @@ import { useChat } from '@/context/chat-context';
 import { Avatar } from '@/components/ui/Avatar';
 import { RenkeiLogo } from '@/components/ui/RenkeiLogo';
 import { DiscordVoicePanel } from './DiscordVoicePanel';
+import { useDiscordVoice } from '@/context/discord-voice-context';
 import { formatRelativeDate } from '@/lib/utils';
 import {
   Search,
@@ -17,6 +18,7 @@ import {
   Check,
   CheckCheck,
   Pin,
+  Radio,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,6 +30,7 @@ interface SidebarProps {
 export function Sidebar({ onOpenNewChat, onOpenNewGroup, onOpenSettings }: SidebarProps) {
   const { user, isDemoMode, switchDemoUser } = useAuth();
   const { conversations, activeConversation, setActiveConversationId, onlineUserIds, nicknames } = useChat();
+  const { isConnected, isVoicePanelOpen, setIsVoicePanelOpen } = useDiscordVoice();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'direct' | 'group'>('all');
@@ -244,8 +247,47 @@ export function Sidebar({ onOpenNewChat, onOpenNewGroup, onOpenSettings }: Sideb
         )}
       </div>
 
-      {/* Discord-Style Bottom Voice & User Control Panel */}
-      <DiscordVoicePanel onOpenSettings={onOpenSettings} />
+      {/* Discord-Style Bottom Voice & User Control Panel (shown when connected or triggered via Voice button) */}
+      {isConnected || isVoicePanelOpen ? (
+        <DiscordVoicePanel onOpenSettings={onOpenSettings} />
+      ) : (
+        /* Compact Clean Bottom Bar when Voice is inactive */
+        <div className="px-3.5 py-2.5 bg-slate-100 dark:bg-[#15171e] border-t border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+          <div
+            onClick={onOpenSettings}
+            className="flex items-center gap-2.5 min-w-0 cursor-pointer p-1 rounded-xl hover:bg-slate-200/60 dark:hover:bg-white/5 transition-colors flex-1"
+          >
+            <Avatar src={user?.avatar_url} name={user?.display_name || user?.username} size="sm" isOnline={true} />
+            <div className="min-w-0 leading-tight">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block truncate">
+                {user?.display_name || user?.username}
+              </span>
+              <span className="text-[10px] text-slate-500 font-mono block truncate">
+                @{user?.username}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsVoicePanelOpen(true)}
+              className="p-2 rounded-xl text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15 transition-all cursor-pointer"
+              title="Open Voice Lounge & Soundboard"
+            >
+              <Radio className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="p-2 rounded-xl text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 dark:hover:bg-cyan-500/15 transition-all cursor-pointer"
+              title="Settings"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Demo Switcher Footer (Only shown when running in demo mode) */}
       {isDemoMode && (

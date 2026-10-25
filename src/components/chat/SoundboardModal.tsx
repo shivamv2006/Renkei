@@ -14,7 +14,28 @@ import {
   Flame,
   Music,
   Radio,
+  Upload,
+  Trash2,
+  Plus,
 } from 'lucide-react';
+
+interface CustomSound {
+  id: string;
+  name: string;
+  audioDataUrl: string;
+  created_at: string;
+}
+
+function playCustomSound(audioDataUrl: string, volumePercent: number = 80) {
+  if (typeof window === 'undefined') return;
+  try {
+    const audio = new Audio(audioDataUrl);
+    audio.volume = Math.max(0, Math.min(1, volumePercent / 100));
+    audio.play().catch((err) => console.warn('[Soundboard] Audio play error:', err));
+  } catch (e) {
+    console.warn('[Soundboard] Custom audio error:', e);
+  }
+}
 
 interface SoundboardModalProps {
   isOpen: boolean;
@@ -331,13 +352,23 @@ export function SoundboardModal({ isOpen, onClose }: SoundboardModalProps) {
   const { isConnected } = useDiscordVoice();
   const [lastPlayed, setLastPlayed] = useState<string | null>(null);
   const [volume, setVolume] = useState<number>(80);
+  const [customSounds, setCustomSounds] = useState<CustomSound[]>([]);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
-  // Load soundboard volume from localStorage
+  // Load soundboard volume and custom uploaded sounds from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('genzoku_soundboard_volume');
-      if (saved !== null) {
-        setVolume(Number(saved));
+      const savedVol = localStorage.getItem('genzoku_soundboard_volume');
+      if (savedVol !== null) {
+        setVolume(Number(savedVol));
+      }
+      try {
+        const savedCustom = localStorage.getItem('renkei_custom_soundboard');
+        if (savedCustom) {
+          setCustomSounds(JSON.parse(savedCustom));
+        }
+      } catch (e) {
+        console.warn(e);
       }
     }
   }, [isOpen]);
@@ -349,11 +380,55 @@ export function SoundboardModal({ isOpen, onClose }: SoundboardModalProps) {
     }
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('audio/') && !file.name.match(/\.(mp3|wav|ogg|m4a|aac|webm)$/i)) {
+      alert('Please upload a valid audio file (.mp3, .wav, .ogg, .webm, etc.)');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (typeof event.target?.result === 'string') {
+        const newSound: CustomSound = {
+          id: `custom-${Date.now()}`,
+          name: file.name.replace(/\.[^/.]+$/, '').slice(0, 24),
+          audioDataUrl: event.target.result,
+          created_at: new Date().toISOString(),
+        };
+        const updated = [newSound, ...customSounds];
+        setCustomSounds(updated);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('renkei_custom_soundboard', JSON.stringify(updated));
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleDeleteCustomSound = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = customSounds.filter((s) => s.id !== id);
+    setCustomSounds(updated);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('renkei_custom_soundboard', JSON.stringify(updated));
+    }
+  };
+
   if (!isOpen) return null;
 
   const handlePlaySound = (soundId: string, name: string) => {
     playSynthesizedSound(soundId, volume);
     setLastPlayed(name);
+    setTimeout(() => setLastPlayed(null), 1500);
+  };
+
+  const handlePlayCustomSound = (sound: CustomSound) => {
+    playCustomSound(sound.audioDataUrl, volume);
+    setLastPlayed(sound.name);
     setTimeout(() => setLastPlayed(null), 1500);
   };
 
@@ -437,32 +512,100 @@ export function SoundboardModal({ isOpen, onClose }: SoundboardModalProps) {
           </span>
         </div>
 
-        {/* Soundboard Grid */}
-        <div className="p-4 sm:p-5 overflow-y-auto">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-            {SOUNDS.map((sound) => (
+        {/* Soundboard Grid & Custom Audio Uploads */}
+        <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
+          {/* Custom Media Upload Audio Section */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <Music className="w-3.5 h-3.5 text-purple-400" />
+                <span>My Custom Sounds ({customSounds.length})</span>
+              </span>
               <button
-                key={sound.id}
                 type="button"
-                onClick={() => handlePlaySound(sound.id, sound.name)}
-                className="group relative p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/60 text-left transition-all active:scale-95 shadow-xs hover:shadow-md cursor-pointer flex flex-col justify-between h-24 overflow-hidden"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-2.5 py-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30 rounded-xl text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
               >
-                <div className="flex items-center justify-between w-full">
-                  <span className="text-2xl group-hover:scale-110 transition-transform">
-                    {sound.icon}
-                  </span>
-                  <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 group-hover:bg-purple-500 group-hover:text-white flex items-center justify-center transition-colors">
-                    <Play className="w-3 h-3 fill-current ml-0.5" />
-                  </div>
-                </div>
-                <div>
-                  <h4 className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
-                    {sound.name}
-                  </h4>
-                  <p className="text-[10px] text-slate-400 truncate">{sound.desc}</p>
-                </div>
+                <Upload className="w-3 h-3" />
+                <span>Upload Audio</span>
               </button>
-            ))}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </div>
+
+            {customSounds.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {customSounds.map((cs) => (
+                  <div
+                    key={cs.id}
+                    onClick={() => handlePlayCustomSound(cs)}
+                    className="group relative p-2.5 rounded-2xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-left transition-all active:scale-95 cursor-pointer flex flex-col justify-between h-20"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg">🎵</span>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteCustomSound(cs.id, e)}
+                        className="p-1 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
+                        title="Delete custom sound"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="truncate">
+                      <h5 className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">{cs.name}</h5>
+                      <span className="text-[9px] text-purple-400 font-mono">Custom Media</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="p-3 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 text-center cursor-pointer hover:border-purple-400/50 transition-colors"
+              >
+                <p className="text-[11px] text-slate-400">
+                  Upload your own meme audio, sounds, or tracks (.mp3, .wav, .webm)
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Official Curated SFX Grid */}
+          <div>
+            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-2">
+              Official SFX Collection (12)
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {SOUNDS.map((sound) => (
+                <button
+                  key={sound.id}
+                  type="button"
+                  onClick={() => handlePlaySound(sound.id, sound.name)}
+                  className="group relative p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/60 text-left transition-all active:scale-95 shadow-xs hover:shadow-md cursor-pointer flex flex-col justify-between h-24 overflow-hidden"
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-2xl group-hover:scale-110 transition-transform">
+                      {sound.icon}
+                    </span>
+                    <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 group-hover:bg-purple-500 group-hover:text-white flex items-center justify-center transition-colors">
+                      <Play className="w-3 h-3 fill-current ml-0.5" />
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
+                      {sound.name}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 truncate">{sound.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

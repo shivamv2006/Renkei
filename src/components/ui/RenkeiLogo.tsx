@@ -150,13 +150,9 @@ export function RenkeiLogo({
             </span>
             <span className={`w-2 h-2 rounded-full ${cur.dotColor} animate-pulse shadow-[0_0_8px_#00f0ff]`} />
           </div>
-          {showTagline ? (
-            <span className="text-[10px] font-semibold text-slate-400 tracking-wide mt-0.5">
-              stay in sync • connect & coordinate
-            </span>
-          ) : (
-            <span className="text-[10px] font-semibold text-cyan-400/90 lowercase tracking-wider mt-0.5">
-              stay in sync
+          {showTagline && (
+            <span className="text-[10px] font-medium text-slate-400 tracking-wide mt-0.5">
+              connect & coordinate
             </span>
           )}
         </div>

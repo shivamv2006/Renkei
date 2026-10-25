@@ -57,6 +57,9 @@ interface DiscordVoiceContextType {
   setSelectedInputDeviceId: (id: string) => void;
   setSelectedOutputDeviceId: (id: string) => void;
   unlockAutoplay: () => void;
+  isVoicePanelOpen: boolean;
+  setIsVoicePanelOpen: (open: boolean | ((p: boolean) => boolean)) => void;
+  toggleVoicePanel: () => void;
 }
 
 const DiscordVoiceContext = createContext<DiscordVoiceContextType | undefined>(undefined);
@@ -82,6 +85,11 @@ export function DiscordVoiceProvider({ children }: { children: React.ReactNode }
   const [isDeafened, setIsDeafened] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isVoicePanelOpen, setIsVoicePanelOpen] = useState(false);
+
+  const toggleVoicePanel = useCallback(() => {
+    setIsVoicePanelOpen((prev) => !prev);
+  }, []);
 
   // Audio Device and Settings States (Discord popups)
   const [inputVolume, setInputVolumeState] = useState(100);
@@ -373,6 +381,7 @@ export function DiscordVoiceProvider({ children }: { children: React.ReactNode }
   // Join Voice Lounge
   const joinVoiceRoom = async (roomName: string = 'Lobby / Voice Lounge') => {
     setCurrentRoomName(roomName);
+    setIsVoicePanelOpen(true);
     playSoundboardChime();
 
     let stream: MediaStream | null = null;
@@ -828,6 +837,9 @@ export function DiscordVoiceProvider({ children }: { children: React.ReactNode }
         setSelectedInputDeviceId,
         setSelectedOutputDeviceId,
         unlockAutoplay,
+        isVoicePanelOpen,
+        setIsVoicePanelOpen,
+        toggleVoicePanel,
       }}
     >
       {children}

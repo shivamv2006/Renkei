@@ -45,6 +45,11 @@ import {
   Lock,
   Shield,
   MessageSquare,
+  Hash,
+  PhoneOff,
+  MicOff,
+  Headphones,
+  VideoOff,
 } from 'lucide-react';
 
 interface ChatPaneProps {
@@ -85,9 +90,30 @@ export function ChatPane({
   const {
     isConnected: isVoiceConnected,
     joinVoiceRoom,
+    leaveVoiceRoom,
+    isMicMuted,
+    toggleMic,
+    isDeafened,
+    toggleDeafen,
+    isCameraOn,
+    toggleCamera,
+    isScreenSharing,
+    startScreenShare,
+    stopScreenShare,
+    speakingUserIds,
+    connectedPeers,
+    currentRoomName,
+    setIsVoicePanelOpen,
     remoteScreenSharer: voiceRemoteScreenSharer,
     setIsViewerOpen,
   } = useDiscordVoice();
+
+  // Discord-style channel navigation inside Groups ('general' text channel vs 'lobby' voice channel)
+  const [activeGroupChannel, setActiveGroupChannel] = useState<'general' | 'lobby'>('general');
+
+  useEffect(() => {
+    setActiveGroupChannel('general');
+  }, [activeConversation?.id]);
 
   const [inputText, setInputText] = useState('');
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -669,19 +695,34 @@ export function ChatPane({
             </button>
           )}
 
-          {/* Quick Voice Lounge Button */}
+          {/* Quick Voice Lounge Button (toggles bottom left panel and connects) */}
           <button
             type="button"
-            onClick={() => (isVoiceConnected ? undefined : joinVoiceRoom(rawTitle ? `Chat / ${rawTitle}` : undefined))}
-            className={`px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer ${
+            onClick={() => {
+              setIsVoicePanelOpen(true);
+              if (!isVoiceConnected) {
+                joinVoiceRoom(rawTitle ? `Chat / ${rawTitle}` : undefined);
+              }
+            }}
+            className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer ${
               isVoiceConnected
                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.3)]'
                 : 'text-slate-400 hover:text-emerald-400 hover:bg-white/5'
             }`}
-            title={isVoiceConnected ? 'Connected to Voice Lounge' : 'Join Voice Room'}
+            title={isVoiceConnected ? 'Voice Connected (Tap to view controls)' : 'Join Voice Room'}
           >
             <Radio className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
-            <span className="hidden sm:inline">{isVoiceConnected ? 'Connected' : 'Voice'}</span>
+            <span className="hidden sm:inline">{isVoiceConnected ? 'In Voice' : 'Voice'}</span>
+          </button>
+
+          {/* Soundbox Quick Button in Header */}
+          <button
+            type="button"
+            onClick={() => setIsSoundboardModalOpen(true)}
+            className="p-2 text-slate-400 hover:text-purple-400 rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
+            title="Open Soundbox (12 SFX & Media Uploads)"
+          >
+            <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
 
           {/* DIY Wallpaper & Theme Button */}
@@ -718,6 +759,67 @@ export function ChatPane({
           </button>
         </div>
       </header>
+
+      {/* Discord-Style Channel Switcher Bar for Groups */}
+      {!isDirect && (
+        <div className="px-3 sm:px-4 py-1.5 bg-[#0e1017] border-b border-white/5 flex items-center justify-between shrink-0 select-none">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setActiveGroupChannel('general')}
+              className={`px-3 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeGroupChannel === 'general'
+                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <Hash className="w-3.5 h-3.5" />
+              <span># general</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveGroupChannel('lobby');
+                joinVoiceRoom(activeConversation.name || 'Group Lobby');
+                setIsVoicePanelOpen(true);
+              }}
+              className={`px-3 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeGroupChannel === 'lobby'
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>🔊 lobby</span>
+              {isVoiceConnected && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              )}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setIsGroupInfoOpen(true)}
+              className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-slate-400 hover:text-cyan-400 hover:bg-white/5 flex items-center gap-1 transition-colors cursor-pointer"
+              title="Invite Friends & Manage Group"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Invite / Members</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsSoundboardModalOpen(true)}
+              className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-slate-400 hover:text-purple-400 hover:bg-white/5 flex items-center gap-1 transition-colors cursor-pointer"
+              title="Open Soundbox (Upload Audio & SFX)"
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Soundbox</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Screen Share Modal */}
       <ScreenShareModal
@@ -766,7 +868,210 @@ export function ChatPane({
         </div>
       )}
 
-      {/* Messages Scroll View */}
+      {/* Discord Group Voice Lobby View VS Regular Message Text Channel */}
+      {!isDirect && activeGroupChannel === 'lobby' ? (
+        <div className="flex-1 flex flex-col justify-between p-4 sm:p-6 bg-[#090b10] overflow-y-auto select-none">
+          {/* Lobby Header */}
+          <div className="flex flex-col items-center text-center space-y-2 mb-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{isVoiceConnected ? 'CONNECTED TO SQUAD LOBBY' : 'READY TO JOIN LOBBY'}</span>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black text-white">
+              🔊 {activeConversation.name} Voice Lounge
+            </h3>
+            <p className="text-xs text-slate-400 max-w-md leading-relaxed">
+              Real-time squad voice chat. Coordinate in-game tactics, broadcast screen streams, and trigger custom soundbox SFX!
+            </p>
+          </div>
+
+          {/* Connected Participants Grid */}
+          <div className="flex-1 flex items-center justify-center my-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5 max-w-2xl w-full">
+              {/* Current User Card */}
+              <div
+                className={`p-4 rounded-3xl bg-[#121520] border transition-all flex flex-col items-center text-center relative ${
+                  isVoiceConnected && speakingUserIds.has(user?.id || '')
+                    ? 'border-emerald-500 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-950/40'
+                    : 'border-white/10'
+                }`}
+              >
+                <div className="relative mb-2">
+                  <Avatar
+                    src={user?.avatar_url}
+                    name={user?.display_name || user?.username}
+                    size="lg"
+                    isOnline={true}
+                  />
+                  {isMicMuted && (
+                    <div className="absolute -bottom-1 -right-1 p-1 rounded-full bg-rose-600 text-white shadow-xs">
+                      <MicOff className="w-3 h-3" />
+                    </div>
+                  )}
+                  {isDeafened && (
+                    <div className="absolute -top-1 -right-1 p-1 rounded-full bg-rose-600 text-white shadow-xs">
+                      <Headphones className="w-3 h-3" />
+                    </div>
+                  )}
+                </div>
+                <h4 className="font-bold text-xs text-white truncate max-w-[120px]">
+                  {user?.display_name || user?.username} (You)
+                </h4>
+                <span className="text-[10px] text-cyan-400 font-mono mt-0.5">
+                  {isVoiceConnected ? (speakingUserIds.has(user?.id || '') ? 'Speaking...' : 'Connected') : 'Ready'}
+                </span>
+              </div>
+
+              {/* Connected Peers Cards */}
+              {connectedPeers.map((peer) => {
+                const isSpeaking = speakingUserIds.has(peer.id) || peer.isSpeaking;
+                return (
+                  <div
+                    key={peer.id}
+                    className={`p-4 rounded-3xl bg-[#121520] border transition-all flex flex-col items-center text-center relative ${
+                      isSpeaking
+                        ? 'border-emerald-500 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-950/40'
+                        : 'border-white/10'
+                    }`}
+                  >
+                    <div className="relative mb-2">
+                      <Avatar src={peer.avatarUrl} name={peer.name} size="lg" isOnline={true} />
+                    </div>
+                    <h4 className="font-bold text-xs text-white truncate max-w-[120px]">
+                      {peer.name}
+                    </h4>
+                    <span className="text-[10px] text-slate-400 font-mono mt-0.5">
+                      {isSpeaking ? 'Speaking 🔊' : 'In Voice'}
+                    </span>
+                  </div>
+                );
+              })}
+
+              {/* Empty state hint if alone */}
+              {connectedPeers.length === 0 && (
+                <div className="p-4 rounded-3xl bg-[#0f1118] border border-dashed border-white/10 flex flex-col items-center justify-center text-center text-slate-500">
+                  <Users className="w-6 h-6 mb-1 text-slate-600" />
+                  <p className="text-[11px] font-medium">Lobby is open</p>
+                  <p className="text-[9px] text-slate-600">Invite squad to join voice!</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Lobby Floating Control Bar */}
+          <div className="p-3 bg-[#131622] border border-white/10 rounded-3xl max-w-xl mx-auto w-full flex flex-wrap items-center justify-between gap-2 shadow-2xl shrink-0">
+            <div className="flex items-center gap-1.5">
+              {/* Mic Toggle */}
+              <button
+                type="button"
+                onClick={toggleMic}
+                disabled={!isVoiceConnected}
+                className={`p-2.5 rounded-2xl transition-all cursor-pointer ${
+                  isMicMuted
+                    ? 'bg-rose-600 text-white'
+                    : 'bg-white/10 hover:bg-white/15 text-slate-200'
+                }`}
+                title={isMicMuted ? 'Unmute Mic' : 'Mute Mic'}
+              >
+                {isMicMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+
+              {/* Deafen Toggle */}
+              <button
+                type="button"
+                onClick={toggleDeafen}
+                disabled={!isVoiceConnected}
+                className={`p-2.5 rounded-2xl transition-all cursor-pointer ${
+                  isDeafened
+                    ? 'bg-rose-600 text-white'
+                    : 'bg-white/10 hover:bg-white/15 text-slate-200'
+                }`}
+                title={isDeafened ? 'Undeafen' : 'Deafen'}
+              >
+                <Headphones className="w-4 h-4" />
+              </button>
+
+              {/* Camera Toggle */}
+              <button
+                type="button"
+                onClick={toggleCamera}
+                disabled={!isVoiceConnected}
+                className={`p-2.5 rounded-2xl transition-all cursor-pointer ${
+                  isCameraOn
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-white/10 hover:bg-white/15 text-slate-200'
+                }`}
+                title={isCameraOn ? 'Turn Off Video' : 'Turn On Video'}
+              >
+                {isCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+              </button>
+
+              {/* Screen Share */}
+              <button
+                type="button"
+                onClick={isScreenSharing ? stopScreenShare : startScreenShare}
+                disabled={!isVoiceConnected}
+                className={`p-2.5 rounded-2xl transition-all cursor-pointer ${
+                  isScreenSharing
+                    ? 'bg-cyan-600 text-white'
+                    : 'bg-white/10 hover:bg-white/15 text-slate-200'
+                }`}
+                title="Share Screen"
+              >
+                <ScreenShare className="w-4 h-4" />
+              </button>
+
+              {/* Soundbox Button directly in voice lounge */}
+              <button
+                type="button"
+                onClick={() => setIsSoundboardModalOpen(true)}
+                className="p-2.5 rounded-2xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 border border-purple-500/30 transition-all cursor-pointer flex items-center gap-1.5"
+                title="Open Soundbox (Upload Audio & SFX)"
+              >
+                <Volume2 className="w-4 h-4" />
+                <span className="text-xs font-bold hidden sm:inline">Soundbox</span>
+              </button>
+            </div>
+
+            {/* Connect / Leave Buttons */}
+            <div className="flex items-center gap-2">
+              {!isVoiceConnected ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    joinVoiceRoom(activeConversation.name || 'Group Lobby');
+                    setIsVoicePanelOpen(true);
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-2xl text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-95"
+                >
+                  <Radio className="w-4 h-4 animate-pulse" />
+                  <span>Connect Voice</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={leaveVoiceRoom}
+                  className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-2xl text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-95"
+                >
+                  <PhoneOff className="w-4 h-4" />
+                  <span>Leave</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setActiveGroupChannel('general')}
+                className="px-3 py-2 bg-white/10 hover:bg-white/15 text-slate-300 font-bold rounded-2xl text-xs cursor-pointer transition-colors"
+                title="Switch back to Text Chat"
+              >
+                # general
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Messages Scroll View */}
       <div
         className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 z-0"
         style={
@@ -1015,6 +1320,8 @@ export function ChatPane({
           </form>
         )}
       </footer>
+        </>
+      )}
     </main>
   );
 }

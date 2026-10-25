@@ -24,6 +24,7 @@ import {
   Check,
   Sliders,
   VolumeX,
+  X,
 } from 'lucide-react';
 
 interface DiscordVoicePanelProps {
@@ -67,6 +68,8 @@ export function DiscordVoicePanel({ onOpenSettings }: DiscordVoicePanelProps) {
     setSelectedOutputDeviceId,
     autoplayBlocked,
     unlockAutoplay,
+    isVoicePanelOpen,
+    setIsVoicePanelOpen,
   } = useDiscordVoice();
 
   const [showActivities, setShowActivities] = useState(false);
@@ -250,6 +253,16 @@ export function DiscordVoicePanel({ onOpenSettings }: DiscordVoicePanelProps) {
             title="Open Soundboard (12 Sounds & Volume Slider)"
           >
             <Volume2 className="w-4 h-4" />
+          </button>
+
+          {/* Close / Collapse Voice Panel Button */}
+          <button
+            type="button"
+            onClick={() => setIsVoicePanelOpen(false)}
+            className="p-2 rounded-xl bg-[#2b2d31] hover:bg-[#35373c] text-slate-400 hover:text-slate-200 transition-colors cursor-pointer shrink-0"
+            title="Close Voice Panel"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}

@@ -34,16 +34,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
 
   useEffect(() => {
+    // 1. Check if user clicked an Instant Demo account
+    const savedDemoUserId = typeof window !== 'undefined'
+      ? localStorage.getItem('genzoku_demo_user')
+      : null;
+
+    if (savedDemoUserId) {
+      const foundUser = MOCK_USERS.find((u) => u.id === savedDemoUserId) || MOCK_CURRENT_USER;
+      setIsDemoMode(true);
+      setUser(foundUser);
+      setIsLoading(false);
+      return;
+    }
+
     const supabase = getSupabaseBrowserClient();
 
     if (!supabase) {
-      // Supabase credentials not yet provided -> Run in Demo/Evaluation mode
+      // Supabase credentials not provided -> Run in Demo mode
       setIsDemoMode(true);
-      const savedUserId = typeof window !== 'undefined'
-        ? localStorage.getItem('genzoku_demo_user')
-        : null;
-      const foundUser = MOCK_USERS.find((u) => u.id === savedUserId) || MOCK_CURRENT_USER;
-      setUser(foundUser);
+      setUser(MOCK_CURRENT_USER);
       setIsLoading(false);
       return;
     }
