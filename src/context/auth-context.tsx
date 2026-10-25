@@ -172,8 +172,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const redirectUrl = typeof window !== 'undefined'
-      ? (window.location.origin.includes('localhost') && !window.location.origin.includes(':3000')
-          ? 'https://localhost'
+      ? (window.location.origin.includes('localhost')
+          ? (process.env.NEXT_PUBLIC_APP_URL || 'https://renkei.app')
           : `${window.location.origin}`)
       : undefined;
 

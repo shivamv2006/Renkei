@@ -6,6 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'out',
   server: {
     androidScheme: 'https',
+    hostname: 'renkei.app',
     cleartext: true,
   },
   android: {
