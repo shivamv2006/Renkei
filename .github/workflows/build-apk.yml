@@ -43,8 +43,10 @@ jobs:
           NEXT_EXPORT: "true"
           NEXT_PUBLIC_APP_NAME: "Renkei"
           NEXT_PUBLIC_APP_TAGLINE: "stay in sync • connect & coordinate"
-          NEXT_PUBLIC_SUPABASE_URL: "https://your-project-ref.supabase.co"
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder"
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://khnrurrsgeoyejywzktk.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_EP4rk35PmTgyKYewuUG9dA_Hl1Np_y7' }}
+          NEXT_PUBLIC_APP_URL: "https://renkei.app"
+          NEXT_PUBLIC_STUN_SERVERS: "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302,stun:stun2.l.google.com:19302"
         run: |
           npm run build
           mkdir -p android/app/src/main/assets/public

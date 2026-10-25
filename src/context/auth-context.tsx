@@ -54,18 +54,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading((prev) => {
         if (prev) {
           console.warn('[GENZOKU] Auth session check timed out, unblocking loading screen');
-          const savedDemoUserId = typeof window !== 'undefined'
-            ? localStorage.getItem('genzoku_demo_user')
-            : null;
-          if (savedDemoUserId) {
-            const found = MOCK_USERS.find((u) => u.id === savedDemoUserId);
-            if (found) setUser(found);
-          }
+          setUser(null);
           return false;
         }
         return false;
       });
-    }, 1500);
+    }, 2000);
 
     // Initial Supabase Session Check
     supabase.auth
@@ -75,17 +69,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           fetchUserProfile(session.user.id);
         } else {
-          const savedDemoUserId = typeof window !== 'undefined'
-            ? localStorage.getItem('genzoku_demo_user')
-            : null;
-          if (savedDemoUserId) {
-            const found = MOCK_USERS.find((u) => u.id === savedDemoUserId);
-            if (found) {
-              setUser(found);
-              setIsLoading(false);
-              return;
-            }
-          }
           setUser(null);
           setIsLoading(false);
         }
@@ -93,6 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .catch((err) => {
         clearTimeout(initTimeout);
         console.warn('[GENZOKU] Auth getSession error:', err);
+        setUser(null);
         setIsLoading(false);
       });
 
@@ -101,17 +85,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         fetchUserProfile(session.user.id);
       } else {
-        const savedDemoUserId = typeof window !== 'undefined'
-          ? localStorage.getItem('genzoku_demo_user')
-          : null;
-        if (savedDemoUserId) {
-          const found = MOCK_USERS.find((u) => u.id === savedDemoUserId);
-          if (found) {
-            setUser(found);
-            setIsLoading(false);
-            return;
-          }
-        }
         setUser(null);
         setIsLoading(false);
       }
