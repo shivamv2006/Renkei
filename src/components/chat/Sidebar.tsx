@@ -210,7 +210,19 @@ export function Sidebar({ onOpenNewChat, onOpenNewGroup, onOpenSettings }: Sideb
 
                   <div className="flex items-center justify-between">
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                      {conv.last_message ? conv.last_message.content : 'No messages yet'}
+                      {conv.last_message ? (
+                        conv.last_message.message_type === 'image' ? (
+                          '📷 Photo / Sticker'
+                        ) : conv.last_message.message_type === 'audio' ? (
+                          '🎤 Voice Note'
+                        ) : conv.last_message.message_type === 'video' ? (
+                          '🎥 Video'
+                        ) : (
+                          conv.last_message.content || 'Message'
+                        )
+                      ) : (
+                        'No messages yet'
+                      )}
                     </p>
                     {conv.unread_count && conv.unread_count > 0 ? (
                       <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-brand-600 text-white shrink-0">

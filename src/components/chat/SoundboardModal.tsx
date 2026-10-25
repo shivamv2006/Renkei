@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDiscordVoice } from '@/context/discord-voice-context';
 import {
   Volume2,
+  Volume1,
+  VolumeX,
   X,
   Sparkles,
   Zap,
@@ -19,14 +21,20 @@ interface SoundboardModalProps {
   onClose: () => void;
 }
 
-// Built-in Web Audio API Sound Synthesizer
-function playSynthesizedSound(soundId: string) {
+// Built-in Web Audio API Sound Synthesizer with Master Volume Adjustment
+function playSynthesizedSound(soundId: string, volumePercent: number = 80) {
   if (typeof window === 'undefined') return;
   const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
   if (!AudioContextClass) return;
 
   const ctx = new AudioContextClass();
   const now = ctx.currentTime;
+
+  // Master Volume Node (controlled by the user's slider)
+  const masterGain = ctx.createGain();
+  const volFactor = Math.max(0, Math.min(1, volumePercent / 100));
+  masterGain.gain.setValueAtTime(volFactor, now);
+  masterGain.connect(ctx.destination);
 
   switch (soundId) {
     case 'airhorn': {
@@ -44,7 +52,7 @@ function playSynthesizedSound(soundId: string) {
         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.65);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(masterGain);
         osc.start(now);
         osc.stop(now + 0.7);
       });
@@ -61,7 +69,7 @@ function playSynthesizedSound(soundId: string) {
       kickGain.gain.setValueAtTime(0.7, now);
       kickGain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
       kickOsc.connect(kickGain);
-      kickGain.connect(ctx.destination);
+      kickGain.connect(masterGain);
       kickOsc.start(now);
       kickOsc.stop(now + 0.15);
 
@@ -73,7 +81,7 @@ function playSynthesizedSound(soundId: string) {
       snareGain.gain.setValueAtTime(0.6, now + 0.2);
       snareGain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
       snareOsc.connect(snareGain);
-      snareGain.connect(ctx.destination);
+      snareGain.connect(masterGain);
       snareOsc.start(now + 0.2);
       snareOsc.stop(now + 0.35);
 
@@ -95,7 +103,7 @@ function playSynthesizedSound(soundId: string) {
 
       noise.connect(filter);
       filter.connect(cymbalGain);
-      cymbalGain.connect(ctx.destination);
+      cymbalGain.connect(masterGain);
       noise.start(now + 0.4);
       noise.stop(now + 1.2);
       break;
@@ -115,7 +123,7 @@ function playSynthesizedSound(soundId: string) {
         gain.gain.setValueAtTime(0.3, n.t);
         gain.gain.exponentialRampToValueAtTime(0.001, n.t + 0.4);
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(masterGain);
         osc.start(n.t);
         osc.stop(n.t + 0.45);
       });
@@ -132,7 +140,7 @@ function playSynthesizedSound(soundId: string) {
       gain.gain.setValueAtTime(0.25, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(masterGain);
       osc.start(now);
       osc.stop(now + 0.5);
       break;
@@ -150,7 +158,7 @@ function playSynthesizedSound(soundId: string) {
         gain.gain.setValueAtTime(0.35, t);
         gain.gain.exponentialRampToValueAtTime(0.01, t + (idx === 3 ? 0.6 : 0.2));
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(masterGain);
         osc.start(t);
         osc.stop(t + (idx === 3 ? 0.65 : 0.25));
       });
@@ -167,7 +175,7 @@ function playSynthesizedSound(soundId: string) {
       gain.gain.setValueAtTime(0.35, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(masterGain);
       osc.start(now);
       osc.stop(now + 0.28);
       break;
@@ -183,7 +191,7 @@ function playSynthesizedSound(soundId: string) {
       gain.gain.setValueAtTime(0.7, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(masterGain);
       osc.start(now);
       osc.stop(now + 0.65);
       break;
@@ -207,7 +215,7 @@ function playSynthesizedSound(soundId: string) {
 
       osc.connect(filter);
       filter.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(masterGain);
       osc.start(now);
       osc.stop(now + 0.32);
       break;
@@ -225,7 +233,7 @@ function playSynthesizedSound(soundId: string) {
       gain.gain.setValueAtTime(0.3, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(masterGain);
       osc.start(now);
       osc.stop(now + 0.5);
       break;
@@ -250,7 +258,7 @@ function playSynthesizedSound(soundId: string) {
 
       noise.connect(filter);
       filter.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(masterGain);
       noise.start(now);
       noise.stop(now + 1.0);
       break;
@@ -268,9 +276,9 @@ function playSynthesizedSound(soundId: string) {
         gain.gain.setValueAtTime(0.2, t);
         gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(masterGain);
         osc.start(t);
-        osc.stop(t + 0.18);
+        osc.stop(t + (idx === 3 ? 0.6 : 0.18));
       });
       break;
     }
@@ -291,7 +299,7 @@ function playSynthesizedSound(soundId: string) {
           gain.gain.setValueAtTime(0.18, chord.t);
           gain.gain.exponentialRampToValueAtTime(0.01, chord.t + 0.35);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(masterGain);
           osc.start(chord.t);
           osc.stop(chord.t + 0.4);
         });
@@ -322,11 +330,29 @@ const SOUNDS = [
 export function SoundboardModal({ isOpen, onClose }: SoundboardModalProps) {
   const { isConnected } = useDiscordVoice();
   const [lastPlayed, setLastPlayed] = useState<string | null>(null);
+  const [volume, setVolume] = useState<number>(80);
+
+  // Load soundboard volume from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('genzoku_soundboard_volume');
+      if (saved !== null) {
+        setVolume(Number(saved));
+      }
+    }
+  }, [isOpen]);
+
+  const handleVolumeChange = (newVol: number) => {
+    setVolume(newVol);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('genzoku_soundboard_volume', String(newVol));
+    }
+  };
 
   if (!isOpen) return null;
 
   const handlePlaySound = (soundId: string, name: string) => {
-    playSynthesizedSound(soundId);
+    playSynthesizedSound(soundId, volume);
     setLastPlayed(name);
     setTimeout(() => setLastPlayed(null), 1500);
   };
@@ -343,7 +369,7 @@ export function SoundboardModal({ isOpen, onClose }: SoundboardModalProps) {
         {/* Header */}
         <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center">
               <Volume2 className="w-4 h-4" />
             </div>
             <div>
@@ -365,13 +391,49 @@ export function SoundboardModal({ isOpen, onClose }: SoundboardModalProps) {
           </button>
         </div>
 
+        {/* Thin, Sleek Sound Volume Adjust Slider Bar */}
+        <div className="px-5 py-2.5 bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs shrink-0">
+          <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold shrink-0">
+            <button
+              type="button"
+              onClick={() => handleVolumeChange(volume > 0 ? 0 : 80)}
+              className="p-1.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors text-purple-600 dark:text-purple-400 cursor-pointer"
+              title={volume === 0 ? 'Unmute Soundboard' : 'Mute Soundboard'}
+            >
+              {volume === 0 ? (
+                <VolumeX className="w-4 h-4 text-rose-500" />
+              ) : volume < 50 ? (
+                <Volume1 className="w-4 h-4" />
+              ) : (
+                <Volume2 className="w-4 h-4" />
+              )}
+            </button>
+            <span className="text-[11px] font-bold">Sound Volume</span>
+          </div>
+
+          <div className="flex items-center gap-3 flex-1 max-w-xs">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={volume}
+              onChange={(e) => handleVolumeChange(Number(e.target.value))}
+              className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-600 dark:accent-purple-500"
+              title={`Sound Volume: ${volume}%`}
+            />
+            <span className="text-[11px] font-mono font-bold text-slate-600 dark:text-slate-300 w-9 text-right shrink-0">
+              {volume}%
+            </span>
+          </div>
+        </div>
+
         {/* Status Hint */}
-        <div className="px-5 py-2 bg-purple-500/10 border-b border-purple-500/20 flex items-center gap-2 text-xs text-purple-700 dark:text-purple-300">
+        <div className="px-5 py-2 bg-purple-500/10 border-b border-purple-500/20 flex items-center gap-2 text-xs text-purple-700 dark:text-purple-300 shrink-0">
           <Sparkles className="w-3.5 h-3.5 shrink-0" />
           <span className="text-[11px]">
             {isConnected
-              ? 'Voice Lounge connected: Tap any sound to broadcast to everyone in the room!'
-              : 'Tap any sound effect to play live audio instantly!'}
+              ? 'Voice Lounge connected: Tap any sound to play at chosen volume!'
+              : 'Tap any sound effect to play live audio with adjustable volume!'}
           </span>
         </div>
 
@@ -405,7 +467,7 @@ export function SoundboardModal({ isOpen, onClose }: SoundboardModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between text-xs text-slate-400">
+        <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between text-xs text-slate-400 shrink-0">
           <span className="text-[11px] font-medium">12 Real-Time Sound Effects</span>
           <button
             type="button"

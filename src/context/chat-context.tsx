@@ -53,6 +53,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
 
   const activeChannelRef = useRef<any>(null);
+  const activeConversationRef = useRef<Conversation | null>(activeConversation);
+
+  useEffect(() => {
+    activeConversationRef.current = activeConversation;
+  }, [activeConversation]);
 
   // Load conversations and registered users
   const loadConversations = useCallback(async () => {
@@ -152,15 +157,77 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           })
           .filter(Boolean) as Conversation[];
 
-        setConversations(formatted);
-        if (!activeConversation && formatted.length > 0) {
-          setActiveConversation(formatted[0]);
+        // 1. Deduplicate direct conversations so each user only appears once in sidebar
+        const uniqueConversations: Conversation[] = [];
+        const seenDirectUserIds = new Set<string>();
+
+        for (const conv of formatted) {
+          if (conv.type === 'direct' && conv.other_user?.id) {
+            if (seenDirectUserIds.has(conv.other_user.id)) {
+              continue;
+            }
+            seenDirectUserIds.add(conv.other_user.id);
+          }
+          uniqueConversations.push(conv);
         }
+
+        // 2. Fetch the latest message for each conversation so the sidebar shows real snippets
+        const convIds = uniqueConversations.map((c) => c.id);
+        if (convIds.length > 0) {
+          try {
+            const { data: latestMsgs } = await supabase
+              .from('messages')
+              .select('id, conversation_id, content, message_type, created_at, sender_id')
+              .in('conversation_id', convIds)
+              .order('created_at', { ascending: false });
+
+            if (latestMsgs) {
+              const msgMap = new Map<string, any>();
+              for (const msg of latestMsgs) {
+                if (!msgMap.has(msg.conversation_id)) {
+                  msgMap.set(msg.conversation_id, msg);
+                }
+              }
+              uniqueConversations.forEach((c) => {
+                if (msgMap.has(c.id)) {
+                  const m = msgMap.get(c.id);
+                  c.last_message = m;
+                  if (!c.last_message_at || new Date(m.created_at) > new Date(c.last_message_at)) {
+                    c.last_message_at = m.created_at;
+                  }
+                }
+              });
+            }
+          } catch (snippetErr) {
+            console.warn('[GENZOKU] Latest message snippets fetch error:', snippetErr);
+          }
+        }
+
+        // 3. Sort conversations: most recent message/created first
+        uniqueConversations.sort((a, b) => {
+          const timeA = new Date(a.last_message_at || a.created_at || 0).getTime();
+          const timeB = new Date(b.last_message_at || b.created_at || 0).getTime();
+          return timeB - timeA;
+        });
+
+        setConversations(uniqueConversations);
+        setActiveConversation((curr) => {
+          if (!curr && uniqueConversations.length > 0) {
+            return uniqueConversations[0];
+          }
+          if (curr) {
+            const match = uniqueConversations.find(
+              (c) => c.id === curr.id || (c.type === 'direct' && c.other_user?.id === curr.other_user?.id)
+            );
+            if (match) return match;
+          }
+          return curr;
+        });
       }
     } catch (err) {
       console.error('[GENZOKU] Failed to fetch conversations:', err);
     }
-  }, [user, activeConversation, isDemoMode]);
+  }, [user?.id, isDemoMode]);
 
   useEffect(() => {
     loadConversations();
@@ -256,6 +323,67 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       )
       .subscribe();
 
+    // Realtime Global Messages listener to keep sidebar updated in real-time
+    const globalMessagesChannel = supabase
+      .channel(`global_messages_${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        async (payload) => {
+          const incoming = payload.new as Message;
+          if (!incoming?.conversation_id) return;
+
+          // If current user sent it, sendMessage optimistic updater already handled it
+          if (incoming.sender_id === user.id) {
+            return;
+          }
+
+          // Fetch sender profile if not already attached
+          let senderProf: UserProfile | undefined;
+          try {
+            const { data: sData } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', incoming.sender_id)
+              .single();
+            if (sData) senderProf = sData as UserProfile;
+          } catch {}
+
+          const fullMsg: Message = {
+            ...incoming,
+            sender: senderProf,
+          };
+
+          // Update active conversation's messages if open
+          if (activeConversationRef.current?.id === incoming.conversation_id) {
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === incoming.id)) return prev;
+              return [...prev, fullMsg];
+            });
+          }
+
+          // Update sidebar conversations list: update snippet, timestamp, and bump to top
+          setConversations((prev) => {
+            const idx = prev.findIndex((c) => c.id === incoming.conversation_id);
+            if (idx === -1) {
+              loadConversations();
+              return prev;
+            }
+
+            const isCurrentActive = activeConversationRef.current?.id === incoming.conversation_id;
+            const target = {
+              ...prev[idx],
+              last_message: fullMsg,
+              last_message_at: incoming.created_at,
+              unread_count: isCurrentActive ? 0 : (prev[idx].unread_count || 0) + 1,
+            };
+            const others = prev.filter((_, i) => i !== idx);
+            return [target, ...others];
+          });
+        }
+      )
+      .subscribe();
+
     const handleBeforeUnload = () => {
       supabase
         .from('profiles')
@@ -274,6 +402,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       handleBeforeUnload();
       presenceChannel.unsubscribe();
       profilesWatcher.unsubscribe();
+      globalMessagesChannel.unsubscribe();
     };
   }, [user?.id, isDemoMode]);
 
@@ -502,6 +631,19 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     // Optimistic UI update
     setMessages((prev) => [...prev, newMsg]);
 
+    // Instantly update the sidebar conversation snippet & move to top
+    setConversations((prev) => {
+      const idx = prev.findIndex((c) => c.id === activeConversation.id);
+      if (idx === -1) return prev;
+      const target = {
+        ...prev[idx],
+        last_message: newMsg,
+        last_message_at: newMsg.created_at,
+      };
+      const others = prev.filter((_, i) => i !== idx);
+      return [target, ...others];
+    });
+
     // Broadcast immediately over Realtime channel so active receiver sees it with zero latency
     if (activeChannelRef.current) {
       try {
@@ -579,14 +721,26 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // Update last message timestamp
+      // Update last message timestamp in database & local state
       await supabase
         .from('conversations')
         .update({
-          last_message_at: new Date().toISOString(),
+          last_message_at: insertedMsg.created_at || new Date().toISOString(),
           last_message_id: insertedMsg.id,
         })
         .eq('id', activeConversation.id);
+
+      setConversations((prev) => {
+        const idx = prev.findIndex((c) => c.id === activeConversation.id);
+        if (idx === -1) return prev;
+        const target = {
+          ...prev[idx],
+          last_message: { ...newMsg, id: insertedMsg.id, created_at: insertedMsg.created_at },
+          last_message_at: insertedMsg.created_at,
+        };
+        const others = prev.filter((_, i) => i !== idx);
+        return [target, ...others];
+      });
     }
   };
 
@@ -686,7 +840,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const createDirectChat = async (targetUser: UserProfile): Promise<string | null> => {
     if (!user) return null;
 
-    // Check if direct conversation already exists
+    // 1. Check if direct conversation already exists in current local state
     const existing = conversations.find(
       (c) => c.type === 'direct' && c.other_user?.id === targetUser.id
     );
@@ -695,6 +849,72 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       return existing.id;
     }
 
+    const supabase = getSupabaseBrowserClient();
+    if (supabase && !isDemoMode) {
+      try {
+        // 2. Check if a direct conversation already exists in Supabase DB between the two users
+        const { data: myMemberships } = await supabase
+          .from('conversation_members')
+          .select('conversation_id')
+          .eq('user_id', user.id);
+
+        if (myMemberships && myMemberships.length > 0) {
+          const myConvIds = myMemberships.map((m) => m.conversation_id);
+          const { data: sharedMembership } = await supabase
+            .from('conversation_members')
+            .select('conversation_id')
+            .eq('user_id', targetUser.id)
+            .in('conversation_id', myConvIds)
+            .limit(1)
+            .maybeSingle();
+
+          if (sharedMembership?.conversation_id) {
+            await loadConversations();
+            return sharedMembership.conversation_id;
+          }
+        }
+
+        // 3. Create fresh direct conversation record in Supabase
+        const { data: convData, error: convErr } = await supabase
+          .from('conversations')
+          .insert({ type: 'direct', created_by: user.id })
+          .select()
+          .single();
+
+        if (convData && !convErr) {
+          await supabase.from('conversation_members').insert([
+            { conversation_id: convData.id, user_id: user.id, role: 'owner' },
+            { conversation_id: convData.id, user_id: targetUser.id, role: 'member' },
+          ]);
+
+          const realConv: Conversation = {
+            id: convData.id,
+            type: 'direct',
+            created_by: user.id,
+            created_at: convData.created_at,
+            updated_at: convData.updated_at,
+            last_message_at: convData.created_at,
+            other_user: targetUser,
+            unread_count: 0,
+            members: [
+              { id: `m1-${Date.now()}`, conversation_id: convData.id, user_id: user.id, role: 'owner', joined_at: new Date().toISOString(), profile: user },
+              { id: `m2-${Date.now()}`, conversation_id: convData.id, user_id: targetUser.id, role: 'member', joined_at: new Date().toISOString(), profile: targetUser },
+            ],
+          };
+
+          setConversations((prev) => [
+            realConv,
+            ...prev.filter((c) => !(c.type === 'direct' && c.other_user?.id === targetUser.id)),
+          ]);
+          setActiveConversation(realConv);
+          return convData.id;
+        }
+      } catch (err) {
+        console.error('[GENZOKU] Error creating direct chat:', err);
+      }
+    }
+
+    // Fallback for offline / demo mode
     const newConv: Conversation = {
       id: `conv-direct-${Date.now()}`,
       type: 'direct',
@@ -711,28 +931,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     setConversations((prev) => [newConv, ...prev]);
     setActiveConversation(newConv);
-
-    const supabase = getSupabaseBrowserClient();
-    if (supabase && !isDemoMode) {
-      try {
-        const { data: convData } = await supabase
-          .from('conversations')
-          .insert({ type: 'direct', created_by: user.id })
-          .select()
-          .single();
-
-        if (convData) {
-          await supabase.from('conversation_members').insert([
-            { conversation_id: convData.id, user_id: user.id, role: 'owner' },
-            { conversation_id: convData.id, user_id: targetUser.id, role: 'member' },
-          ]);
-          return convData.id;
-        }
-      } catch (err) {
-        console.error('[GENZOKU] Error creating direct chat:', err);
-      }
-    }
-
     return newConv.id;
   };
 

@@ -226,12 +226,12 @@ export function DiscordVoicePanel({ onOpenSettings }: DiscordVoicePanelProps) {
           </div>
         </div>
       ) : (
-        /* When not connected to Voice: Sleek One-Tap Join Button */
-        <div className="p-2 border-b border-white/5">
+        /* When not connected to Voice: Sleek One-Tap Join Button & Quick Soundboard */
+        <div className="p-2 border-b border-white/5 flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => joinVoiceRoom()}
-            className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center justify-between shadow-md shadow-emerald-950/40 cursor-pointer transition-all active:scale-[0.98]"
+            className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center justify-between shadow-md shadow-emerald-950/40 cursor-pointer transition-all active:scale-[0.98]"
           >
             <div className="flex items-center gap-2">
               <Radio className="w-4 h-4 animate-pulse" />
@@ -240,6 +240,16 @@ export function DiscordVoicePanel({ onOpenSettings }: DiscordVoicePanelProps) {
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/20 font-mono">
               Free P2P
             </span>
+          </button>
+
+          {/* Quick Soundboard Launcher Button */}
+          <button
+            type="button"
+            onClick={() => setShowSoundboard(true)}
+            className="p-2 rounded-xl bg-[#2b2d31] hover:bg-[#35373c] text-slate-300 hover:text-purple-300 transition-colors cursor-pointer shrink-0"
+            title="Open Soundboard (12 Sounds & Volume Slider)"
+          >
+            <Volume2 className="w-4 h-4" />
           </button>
         </div>
       )}
