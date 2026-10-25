@@ -1,7 +1,18 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { Conversation, Message, MessageType, UserProfile, Attachment, MessageReaction, RoleType, ConversationMember } from '@/types';
+import {
+  Conversation,
+  Message,
+  MessageType,
+  UserProfile,
+  Attachment,
+  MessageReaction,
+  RoleType,
+  ConversationMember,
+  UsernameRequest,
+  InAppNotification,
+} from '@/types';
 import { useAuth } from './auth-context';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { MOCK_CONVERSATIONS, MOCK_MESSAGES_AOI, MOCK_USERS } from '@/lib/mock-data';
@@ -38,6 +49,16 @@ interface ChatContextType {
   markAsRead: (conversationId: string) => void;
   allUsers: UserProfile[];
   searchUsers: (query: string) => Promise<UserProfile[]>;
+  nicknames: { [userId: string]: string };
+  setFriendNickname: (targetUserId: string, nickname: string) => Promise<void>;
+  removeFriendNickname: (targetUserId: string) => Promise<void>;
+  notifications: InAppNotification[];
+  dismissNotification: (id: string) => void;
+  clearAllNotifications: () => void;
+  usernameRequests: UsernameRequest[];
+  submitUsernameRequest: (requestedUsername: string) => Promise<{ success: boolean; message: string; requiresRequest?: boolean }>;
+  approveUsernameRequest: (requestId: string) => Promise<void>;
+  rejectUsernameRequest: (requestId: string) => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -51,6 +72,25 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [typingUsers, setTypingUsers] = useState<{ [conversationId: string]: string[] }>({});
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [nicknames, setNicknames] = useState<{ [userId: string]: string }>({});
+  const [notifications, setNotifications] = useState<InAppNotification[]>([]);
+  const [usernameRequests, setUsernameRequests] = useState<UsernameRequest[]>([]);
+
+  // Load saved nicknames, notifications and username requests from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedNicknames = localStorage.getItem('renkei_friend_nicknames');
+        if (savedNicknames) setNicknames(JSON.parse(savedNicknames));
+
+        const savedNotifs = localStorage.getItem('renkei_notifications');
+        if (savedNotifs) setNotifications(JSON.parse(savedNotifs));
+
+        const savedReqs = localStorage.getItem('renkei_username_requests');
+        if (savedReqs) setUsernameRequests(JSON.parse(savedReqs));
+      } catch (e) {}
+    }
+  }, []);
 
   const activeChannelRef = useRef<any>(null);
   const activeConversationRef = useRef<Conversation | null>(activeConversation);
@@ -1183,6 +1223,173 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setConversations((prev) => prev.filter((c) => c.id !== conversationId));
   };
 
+  const setFriendNickname = async (targetUserId: string, nickname: string) => {
+    if (!user) return;
+    const cleanNick = nickname.trim();
+    const updated = { ...nicknames, [targetUserId]: cleanNick };
+    setNicknames(updated);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('renkei_friend_nicknames', JSON.stringify(updated));
+    }
+
+    // Create notification for the friend
+    const notif: InAppNotification = {
+      id: `notif-${Date.now()}`,
+      user_id: targetUserId,
+      title: 'New Nickname Set! 🏷️',
+      message: `${user.display_name} gave you the nickname "${cleanNick}"`,
+      type: 'nickname',
+      read: false,
+      created_at: new Date().toISOString(),
+    };
+
+    setNotifications((prev) => [notif, ...prev]);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('renkei_notifications', JSON.stringify([notif, ...notifications]));
+    }
+  };
+
+  const removeFriendNickname = async (targetUserId: string) => {
+    const updated = { ...nicknames };
+    delete updated[targetUserId];
+    setNicknames(updated);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('renkei_friend_nicknames', JSON.stringify(updated));
+    }
+  };
+
+  const dismissNotification = (id: string) => {
+    setNotifications((prev) => {
+      const filtered = prev.filter((n) => n.id !== id);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('renkei_notifications', JSON.stringify(filtered));
+      }
+      return filtered;
+    });
+  };
+
+  const clearAllNotifications = () => {
+    setNotifications([]);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('renkei_notifications');
+    }
+  };
+
+  const submitUsernameRequest = async (requestedUsername: string) => {
+    if (!user) return { success: false, message: 'Not authenticated' };
+    const clean = requestedUsername.toLowerCase().trim().replace(/^@+/, '');
+
+    if (!clean || clean.length < 3) {
+      return { success: false, message: 'Username must be at least 3 characters long.' };
+    }
+
+    if (clean === user.username?.toLowerCase()) {
+      return { success: false, message: 'This is already your current username.' };
+    }
+
+    const supabase = getSupabaseBrowserClient();
+
+    // Check availability in allUsers and in Supabase
+    let isTaken = allUsers.some((u) => u.username?.toLowerCase() === clean && u.id !== user.id);
+
+    if (!isTaken && supabase && !isDemoMode) {
+      try {
+        const { data: existing } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', clean)
+          .maybeSingle();
+        if (existing && existing.id !== user.id) {
+          isTaken = true;
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+
+    if (!isTaken) {
+      // Username is free! Update immediately
+      if (supabase && !isDemoMode) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ username: clean })
+          .eq('id', user.id);
+        if (error) {
+          return { success: false, message: error.message };
+        }
+      }
+      user.username = clean;
+      return { success: true, message: `Username updated to @${clean}!` };
+    }
+
+    // Username is taken! Create a change/claim request that the owner can approve
+    const newReq: UsernameRequest = {
+      id: `req-${Date.now()}`,
+      requester_id: user.id,
+      requester_username: user.username,
+      requested_username: clean,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    };
+
+    const updatedReqs = [newReq, ...usernameRequests];
+    setUsernameRequests(updatedReqs);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('renkei_username_requests', JSON.stringify(updatedReqs));
+    }
+
+    const notif: InAppNotification = {
+      id: `notif-req-${Date.now()}`,
+      user_id: user.id,
+      title: 'Username Request Submitted 🛡️',
+      message: `Your ownership request for reserved handle @${clean} has been submitted for Owner review.`,
+      type: 'username_request',
+      read: false,
+      created_at: new Date().toISOString(),
+    };
+    setNotifications((prev) => [notif, ...prev]);
+
+    return {
+      success: false,
+      requiresRequest: true,
+      message: `Username @${clean} is currently reserved by another member. A change request has been submitted to the Owner for approval!`,
+    };
+  };
+
+  const approveUsernameRequest = async (requestId: string) => {
+    const req = usernameRequests.find((r) => r.id === requestId);
+    if (!req) return;
+
+    const updated = usernameRequests.map((r) =>
+      r.id === requestId ? { ...r, status: 'approved' as const } : r
+    );
+    setUsernameRequests(updated);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('renkei_username_requests', JSON.stringify(updated));
+    }
+
+    const notif: InAppNotification = {
+      id: `notif-app-${Date.now()}`,
+      user_id: req.requester_id,
+      title: 'Username Request Approved! 🎉',
+      message: `Your request for @${req.requested_username} has been approved by the Owner!`,
+      type: 'username_request',
+      read: false,
+      created_at: new Date().toISOString(),
+    };
+    setNotifications((prev) => [notif, ...prev]);
+  };
+
+  const rejectUsernameRequest = async (requestId: string) => {
+    const updated = usernameRequests.map((r) =>
+      r.id === requestId ? { ...r, status: 'rejected' as const } : r
+    );
+    setUsernameRequests(updated);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('renkei_username_requests', JSON.stringify(updated));
+    }
+  };
+
   return (
     <ChatContext.Provider
       value={{
@@ -1208,6 +1415,16 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         markAsRead,
         allUsers,
         searchUsers,
+        nicknames,
+        setFriendNickname,
+        removeFriendNickname,
+        notifications,
+        dismissNotification,
+        clearAllNotifications,
+        usernameRequests,
+        submitUsernameRequest,
+        approveUsernameRequest,
+        rejectUsernameRequest,
       }}
     >
       {children}

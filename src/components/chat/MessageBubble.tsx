@@ -51,6 +51,12 @@ export function MessageBubble({
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const isSelf = message.sender_id === user?.id;
+  const isMentioned = Boolean(
+    user?.username &&
+    !isSelf &&
+    message.content &&
+    new RegExp(`@${user.username}\\b`, 'i').test(message.content)
+  );
 
   // Resolve reply target message
   const replyTarget =
@@ -186,6 +192,8 @@ export function MessageBubble({
               : undefined
           }
           className={`px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm shadow-xs transition-all select-text ${
+            isMentioned ? 'ring-2 ring-amber-400 dark:ring-amber-400 shadow-md shadow-amber-500/20' : ''
+          } ${
             message.send_failed
               ? 'bg-rose-600 text-white rounded-br-xs ring-2 ring-rose-300 dark:ring-rose-400'
               : isSelf
@@ -345,7 +353,34 @@ export function MessageBubble({
             !videoSource &&
             !audioSource &&
             !message.content.startsWith('data:') && (
-              <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
+              <p className="whitespace-pre-wrap break-words leading-relaxed">
+                {message.content.includes('@')
+                  ? message.content.split(/(@[\w.-]+)/g).map((part, index) => {
+                      if (part.startsWith('@')) {
+                        const uname = part.slice(1).toLowerCase();
+                        const isMentionMe = user?.username && uname === user.username.toLowerCase();
+                        return (
+                          <span
+                            key={index}
+                            className={`inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded-md font-bold text-xs transition-colors ${
+                              isMentionMe
+                                ? 'bg-amber-400/30 text-amber-200 border border-amber-400/60 shadow-xs'
+                                : 'bg-brand-500/25 text-brand-200 border border-brand-400/30'
+                            }`}
+                          >
+                            {part}
+                            {isMentionMe && (
+                              <span className="text-[9px] ml-1 uppercase tracking-wider font-extrabold opacity-90">
+                                you
+                              </span>
+                            )}
+                          </span>
+                        );
+                      }
+                      return part;
+                    })
+                  : message.content}
+              </p>
             )}
 
           {/* Meta Bar: Time + Edited + Receipts */}

@@ -78,7 +78,12 @@ export default function DashboardPage() {
             !activeConversation ? 'hidden md:flex' : 'flex w-full'
           }`}
         >
-          <ChatPane onBackMobile={() => setActiveConversationId(null)} />
+          <ChatPane
+            onBackMobile={() => setActiveConversationId(null)}
+            onOpenNewChat={() => setIsNewChatOpen(true)}
+            onOpenNewGroup={() => setIsNewGroupOpen(true)}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+          />
         </div>
       </div>
 

@@ -27,7 +27,7 @@ interface SidebarProps {
 
 export function Sidebar({ onOpenNewChat, onOpenNewGroup, onOpenSettings }: SidebarProps) {
   const { user, isDemoMode, switchDemoUser } = useAuth();
-  const { conversations, activeConversation, setActiveConversationId, onlineUserIds } = useChat();
+  const { conversations, activeConversation, setActiveConversationId, onlineUserIds, nicknames } = useChat();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'direct' | 'group'>('all');
@@ -88,11 +88,16 @@ export function Sidebar({ onOpenNewChat, onOpenNewGroup, onOpenSettings }: Sideb
               size="sm"
               isOnline={true}
             />
-            <div className="leading-tight">
-              <span className="font-bold text-xs text-slate-900 dark:text-slate-100 block">
+            <div className="leading-tight min-w-0">
+              <span className="font-bold text-xs text-slate-900 dark:text-slate-100 block truncate">
                 {user?.display_name}
               </span>
-              <span className="text-[10px] text-slate-400">@{user?.username}</span>
+              <span className="text-[10px] text-slate-400 font-mono">@{user?.username}</span>
+              {user?.bio && (
+                <p className="text-[10px] text-slate-400 italic truncate max-w-[150px] mt-0.5">
+                  &ldquo;{user.bio}&rdquo;
+                </p>
+              )}
             </div>
           </div>
           {isDemoMode && (
@@ -164,7 +169,9 @@ export function Sidebar({ onOpenNewChat, onOpenNewGroup, onOpenSettings }: Sideb
         ) : (
           filteredConversations.map((conv) => {
             const isDirect = conv.type === 'direct';
-            const title = isDirect ? conv.other_user?.display_name : conv.name;
+            const rawTitle = isDirect ? conv.other_user?.display_name : conv.name;
+            const friendNick = isDirect && conv.other_user ? nicknames[conv.other_user.id] : undefined;
+            const title = friendNick ? `${friendNick} (${rawTitle})` : rawTitle;
             const avatar = isDirect ? conv.other_user?.avatar_url : conv.avatar_url;
             const isOnline = isDirect
               ? (conv.other_user?.id ? onlineUserIds.has(conv.other_user.id) : false) || Boolean(conv.other_user?.is_online)

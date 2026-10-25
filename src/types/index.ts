@@ -17,11 +17,40 @@ export interface UserProfile {
   phone_number?: string | null;
   avatar_url?: string | null;
   status_text?: string | null;
+  bio?: string | null;
   created_at: string;
   updated_at: string;
   is_online?: boolean;
   last_seen_at?: string | null;
   is_demo?: boolean;
+}
+
+export interface FriendNickname {
+  target_user_id: string;
+  nickname: string;
+  set_by_id: string;
+  set_by_name: string;
+  updated_at: string;
+}
+
+export interface UsernameRequest {
+  id: string;
+  requester_id: string;
+  requester_username: string;
+  requested_username: string;
+  current_owner_id?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+}
+
+export interface InAppNotification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  type: 'nickname' | 'mention' | 'username_request' | 'general';
+  read: boolean;
+  created_at: string;
 }
 
 export interface Attachment {

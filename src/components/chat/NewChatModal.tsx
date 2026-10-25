@@ -5,7 +5,7 @@ import { UserProfile } from '@/types';
 import { useAuth } from '@/context/auth-context';
 import { useChat } from '@/context/chat-context';
 import { Avatar } from '@/components/ui/Avatar';
-import { X, Search, UserPlus, Info } from 'lucide-react';
+import { X, Search, UserPlus, Shield, MessageSquare, AtSign, Sparkles } from 'lucide-react';
 
 interface NewChatModalProps {
   isOpen: boolean;
@@ -13,8 +13,8 @@ interface NewChatModalProps {
 }
 
 export function NewChatModal({ isOpen, onClose }: NewChatModalProps) {
-  const { isDemoMode } = useAuth();
-  const { allUsers, searchUsers, createDirectChat, onlineUserIds } = useChat();
+  const { user } = useAuth();
+  const { allUsers, searchUsers, createDirectChat, nicknames } = useChat();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -24,13 +24,34 @@ export function NewChatModal({ isOpen, onClose }: NewChatModalProps) {
   const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const q = e.target.value;
     setSearchQuery(q);
-    if (!q.trim()) {
+    const cleanQuery = q.trim().replace(/^@+/, '').toLowerCase();
+    if (!cleanQuery) {
       setSearchResults([]);
       return;
     }
+
     setIsSearching(true);
-    const results = await searchUsers(q);
-    setSearchResults(results);
+    // 1. Search locally in loaded users
+    const localMatches = allUsers.filter(
+      (u) =>
+        u.id !== user?.id &&
+        (u.username?.toLowerCase().includes(cleanQuery) ||
+          u.display_name?.toLowerCase().includes(cleanQuery))
+    );
+
+    // 2. Also query server for exact username match
+    try {
+      const serverMatches = await searchUsers(cleanQuery);
+      const combined = [...localMatches];
+      serverMatches.forEach((s) => {
+        if (s.id !== user?.id && !combined.some((m) => m.id === s.id)) {
+          combined.push(s);
+        }
+      });
+      setSearchResults(combined);
+    } catch {
+      setSearchResults(localMatches);
+    }
     setIsSearching(false);
   };
 
@@ -39,18 +60,27 @@ export function NewChatModal({ isOpen, onClose }: NewChatModalProps) {
     onClose();
   };
 
-  const usersToDisplay = searchQuery.trim() ? searchResults : allUsers;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[500px]">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-in fade-in select-none"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[520px]"
+      >
         {/* Header */}
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <UserPlus className="w-5 h-5 text-brand-600" />
-            <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
-              Start a Conversation
-            </h3>
+            <div className="w-8 h-8 rounded-xl bg-brand-500/10 dark:bg-brand-500/20 text-brand-500 flex items-center justify-center">
+              <UserPlus className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                Private Username Search
+              </h3>
+              <p className="text-[10px] text-slate-400">Search exact @username to connect</p>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -60,13 +90,13 @@ export function NewChatModal({ isOpen, onClose }: NewChatModalProps) {
           </button>
         </div>
 
-        {/* Search Input */}
+        {/* Search Input Bar */}
         <div className="p-3 border-b border-slate-200 dark:border-slate-800">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by name or @username..."
+              placeholder="Type exact @username or friend's name..."
               value={searchQuery}
               onChange={handleSearch}
               autoFocus
@@ -75,50 +105,71 @@ export function NewChatModal({ isOpen, onClose }: NewChatModalProps) {
           </div>
         </div>
 
-        {/* Status Indicator */}
-        <div className={`px-4 py-2 border-b flex items-center gap-2 text-[11px] ${
-          isDemoMode
-            ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/50'
-            : 'bg-slate-50 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800'
-        }`}>
-          <Info className="w-3.5 h-3.5 shrink-0" />
-          <span>
-            {isDemoMode
-              ? 'Offline Demo Mode: Displaying mock sample accounts for evaluation.'
-              : 'Live Directory: Showing registered GENZOKU accounts.'}
-          </span>
-        </div>
-
-        {/* User Results List */}
+        {/* User Results List OR Privacy Screen */}
         <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 p-2">
-          {isSearching ? (
-            <div className="p-6 text-center text-xs text-slate-400">Searching directory...</div>
-          ) : usersToDisplay.length === 0 ? (
-            <div className="p-6 text-center text-xs text-slate-400">No users found.</div>
-          ) : (
-            usersToDisplay.map((u) => (
-              <div
-                key={u.id}
-                onClick={() => handleSelectUser(u)}
-                className="p-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/60 rounded-xl cursor-pointer transition-colors"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <Avatar src={u.avatar_url} name={u.display_name} size="md" isOnline={onlineUserIds.has(u.id) || Boolean(u.is_online)} />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-xs text-slate-900 dark:text-slate-100 truncate">
-                      {u.display_name}
-                    </h4>
-                    <p className="text-[11px] text-slate-400 truncate">@{u.username}</p>
-                  </div>
-                </div>
-
-                {(isDemoMode || u.is_demo) && (
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0 ml-2">
-                    DEMO
-                  </span>
-                )}
+          {!searchQuery.trim() ? (
+            /* Privacy Screen: Do NOT dump all usernames publicly */
+            <div className="p-8 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
+                <Shield className="w-6 h-6 text-brand-500" />
               </div>
-            ))
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Protected Username Privacy
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-xs mx-auto mt-1 leading-relaxed">
+                  To protect member privacy, users are not publicly browsable. Type a friend&apos;s
+                  exact <span className="font-mono text-brand-500 font-bold">@username</span> above to find them!
+                </p>
+              </div>
+            </div>
+          ) : isSearching ? (
+            <div className="p-8 text-center text-xs text-slate-400">Searching directory...</div>
+          ) : searchResults.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-400">
+              No user found matching &quot;{searchQuery}&quot;. Please check the spelling of the @username.
+            </div>
+          ) : (
+            searchResults.map((u) => {
+              const customNickname = nicknames[u.id];
+              return (
+                <div
+                  key={u.id}
+                  onClick={() => handleSelectUser(u)}
+                  className="p-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/60 rounded-2xl cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar src={u.avatar_url} name={u.display_name} size="md" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
+                          {customNickname || u.display_name}
+                        </h4>
+                        {customNickname && (
+                          <span className="text-[10px] text-purple-400 font-semibold">
+                            ({u.display_name})
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-mono text-brand-500 font-semibold block">
+                        @{u.username}
+                      </span>
+                      {u.bio && (
+                        <p className="text-[10px] text-slate-400 truncate max-w-xs">{u.bio}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-all shadow-xs"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Chat</span>
+                  </button>
+                </div>
+              );
+            })
           )}
         </div>
       </div>
