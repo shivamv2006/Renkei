@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { Conversation, Message, MessageType, UserProfile, Attachment, MessageReaction } from '@/types';
+import { Conversation, Message, MessageType, UserProfile, Attachment, MessageReaction, RoleType, ConversationMember } from '@/types';
 import { useAuth } from './auth-context';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { MOCK_CONVERSATIONS, MOCK_MESSAGES_AOI, MOCK_USERS } from '@/lib/mock-data';
@@ -26,6 +26,14 @@ interface ChatContextType {
   addReaction: (messageId: string, emoji: string) => Promise<void>;
   createDirectChat: (targetUser: UserProfile) => Promise<string | null>;
   createGroupChat: (name: string, description: string, memberIds: string[]) => Promise<string | null>;
+  updateGroupInfo: (
+    conversationId: string,
+    updates: { name?: string; description?: string; avatar_url?: string }
+  ) => Promise<void>;
+  updateMemberRole: (conversationId: string, userId: string, newRole: RoleType) => Promise<void>;
+  addGroupMember: (conversationId: string, userId: string) => Promise<void>;
+  removeGroupMember: (conversationId: string, userId: string) => Promise<void>;
+  leaveGroup: (conversationId: string) => Promise<void>;
   setTyping: (isTyping: boolean) => void;
   markAsRead: (conversationId: string) => void;
   allUsers: UserProfile[];
@@ -834,6 +842,149 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     return (data as UserProfile[]) || [];
   };
 
+  const updateGroupInfo = async (
+    conversationId: string,
+    updates: { name?: string; description?: string; avatar_url?: string }
+  ) => {
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conversationId ? { ...c, ...updates, updated_at: new Date().toISOString() } : c))
+    );
+    if (activeConversation?.id === conversationId) {
+      setActiveConversation((prev) => (prev ? { ...prev, ...updates, updated_at: new Date().toISOString() } : null));
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    if (supabase && !isDemoMode && !user?.is_demo) {
+      try {
+        await supabase.from('conversations').update(updates).eq('id', conversationId);
+      } catch (err) {
+        console.warn('[Renkei] Error updating group info:', err);
+      }
+    }
+  };
+
+  const updateMemberRole = async (conversationId: string, targetUserId: string, newRole: RoleType) => {
+    setConversations((prev) =>
+      prev.map((c) => {
+        if (c.id !== conversationId) return c;
+        const updatedMembers = (c.members || []).map((m) =>
+          m.user_id === targetUserId ? { ...m, role: newRole } : m
+        );
+        return { ...c, members: updatedMembers };
+      })
+    );
+    if (activeConversation?.id === conversationId) {
+      setActiveConversation((prev) => {
+        if (!prev) return null;
+        const updatedMembers = (prev.members || []).map((m) =>
+          m.user_id === targetUserId ? { ...m, role: newRole } : m
+        );
+        return { ...prev, members: updatedMembers };
+      });
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    if (supabase && !isDemoMode && !user?.is_demo) {
+      try {
+        await supabase
+          .from('conversation_members')
+          .update({ role: newRole })
+          .eq('conversation_id', conversationId)
+          .eq('user_id', targetUserId);
+      } catch (err) {
+        console.warn('[Renkei] Error updating member role:', err);
+      }
+    }
+  };
+
+  const addGroupMember = async (conversationId: string, newUserId: string) => {
+    const targetUser = allUsers.find((u) => u.id === newUserId) || {
+      id: newUserId,
+      username: `user_${newUserId.slice(-4)}`,
+      display_name: 'Member',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const newMember: ConversationMember = {
+      id: `mem-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      conversation_id: conversationId,
+      user_id: newUserId,
+      role: 'member',
+      joined_at: new Date().toISOString(),
+      profile: targetUser,
+    };
+
+    setConversations((prev) =>
+      prev.map((c) => {
+        if (c.id !== conversationId) return c;
+        const existingMembers = c.members || [];
+        if (existingMembers.some((m) => m.user_id === newUserId)) return c;
+        return { ...c, members: [...existingMembers, newMember] };
+      })
+    );
+
+    if (activeConversation?.id === conversationId) {
+      setActiveConversation((prev) => {
+        if (!prev) return null;
+        const existingMembers = prev.members || [];
+        if (existingMembers.some((m) => m.user_id === newUserId)) return prev;
+        return { ...prev, members: [...existingMembers, newMember] };
+      });
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    if (supabase && !isDemoMode && !user?.is_demo) {
+      try {
+        await supabase.from('conversation_members').insert({
+          conversation_id: conversationId,
+          user_id: newUserId,
+          role: 'member',
+        });
+      } catch (err) {
+        console.warn('[Renkei] Error adding group member:', err);
+      }
+    }
+  };
+
+  const removeGroupMember = async (conversationId: string, targetUserId: string) => {
+    setConversations((prev) =>
+      prev.map((c) => {
+        if (c.id !== conversationId) return c;
+        return { ...c, members: (c.members || []).filter((m) => m.user_id !== targetUserId) };
+      })
+    );
+
+    if (activeConversation?.id === conversationId) {
+      setActiveConversation((prev) => {
+        if (!prev) return null;
+        return { ...prev, members: (prev.members || []).filter((m) => m.user_id !== targetUserId) };
+      });
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    if (supabase && !isDemoMode && !user?.is_demo) {
+      try {
+        await supabase
+          .from('conversation_members')
+          .delete()
+          .eq('conversation_id', conversationId)
+          .eq('user_id', targetUserId);
+      } catch (err) {
+        console.warn('[Renkei] Error removing group member:', err);
+      }
+    }
+  };
+
+  const leaveGroup = async (conversationId: string) => {
+    if (!user) return;
+    await removeGroupMember(conversationId, user.id);
+    if (activeConversation?.id === conversationId) {
+      setActiveConversation(null);
+    }
+    setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+  };
+
   return (
     <ChatContext.Provider
       value={{
@@ -850,6 +1001,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         addReaction,
         createDirectChat,
         createGroupChat,
+        updateGroupInfo,
+        updateMemberRole,
+        addGroupMember,
+        removeGroupMember,
+        leaveGroup,
         setTyping,
         markAsRead,
         allUsers,

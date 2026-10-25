@@ -10,6 +10,7 @@ import { MessageBubble } from './MessageBubble';
 import { EmojiGifPicker } from './EmojiGifPicker';
 import { ThemeWallpaperModal } from './ThemeWallpaperModal';
 import { ScreenShareModal } from './ScreenShareModal';
+import { GroupInfoModal } from './GroupInfoModal';
 import { RenkeiLogo } from '@/components/ui/RenkeiLogo';
 import { BRANDING } from '@/config/branding';
 import { Message, Attachment } from '@/types';
@@ -28,6 +29,9 @@ import {
   Square,
   Palette,
   Radio,
+  Phone,
+  Video,
+  Info,
 } from 'lucide-react';
 
 interface ChatPaneProps {
@@ -63,6 +67,7 @@ export function ChatPane({ onBackMobile }: ChatPaneProps) {
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [isScreenShareOpen, setIsScreenShareOpen] = useState(false);
+  const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
   const [remoteScreenSharer, setRemoteScreenSharer] = useState<{ userName: string } | null>(null);
   const [chatWallpaper, setChatWallpaper] = useState<string>('');
 
@@ -378,13 +383,29 @@ export function ChatPane({ onBackMobile }: ChatPaneProps) {
         onSelectWallpaper={handleSelectWallpaper}
       />
 
+      {/* Group Info & Member Management Modal */}
+      {!isDirect && (
+        <GroupInfoModal
+          isOpen={isGroupInfoOpen}
+          onClose={() => setIsGroupInfoOpen(false)}
+          conversation={activeConversation}
+        />
+      )}
+
       {/* Top Header */}
-      <header className="h-16 px-4 flex items-center justify-between bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 shrink-0 select-none z-10">
-        <div className="flex items-center gap-3">
+      <header className="h-16 px-3 sm:px-4 flex items-center justify-between bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 shrink-0 select-none z-10">
+        <div
+          className={`flex items-center gap-2 sm:gap-3 min-w-0 ${!isDirect ? 'cursor-pointer hover:opacity-90' : ''}`}
+          onClick={!isDirect ? () => setIsGroupInfoOpen(true) : undefined}
+          title={!isDirect ? 'Tap to view Group Info & Members' : undefined}
+        >
           {onBackMobile && (
             <button
-              onClick={onBackMobile}
-              className="md:hidden p-1.5 -ml-1.5 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onBackMobile();
+              }}
+              className="md:hidden p-1.5 -ml-1 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer"
             >
               <ChevronLeft className="w-6 h-6" />
             </button>
@@ -392,9 +413,9 @@ export function ChatPane({ onBackMobile }: ChatPaneProps) {
 
           <Avatar src={avatar} name={title} size="md" isOnline={isOnline} />
 
-          <div className="leading-tight">
-            <div className="flex items-center gap-2">
-              <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate max-w-[160px] sm:max-w-xs">
+          <div className="leading-tight min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate max-w-[130px] sm:max-w-xs">
                 {title}
               </h3>
               {isDirect && (activeConversation.other_user?.is_demo || isDemoMode) && (
@@ -419,20 +440,55 @@ export function ChatPane({ onBackMobile }: ChatPaneProps) {
                 )}
               </div>
             ) : (
-              <span className="text-[11px] text-slate-400">
-                {activeConversation.members?.length || 0} members
-              </span>
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-brand-500 transition-colors">
+                <span>{activeConversation.members?.length || 0} members</span>
+                <span className="text-[10px] text-brand-500 font-semibold">• Tap for Info</span>
+              </div>
             )}
           </div>
         </div>
 
         {/* Header Action Buttons */}
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {/* Direct 1-on-1 Call Buttons (Voice & Video) */}
+          {isDirect && activeConversation.other_user && (
+            <>
+              <button
+                type="button"
+                onClick={() => initiateCall(activeConversation.other_user!, 'audio')}
+                className="p-2 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors cursor-pointer"
+                title="Start Voice Call"
+              >
+                <Phone className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => initiateCall(activeConversation.other_user!, 'video')}
+                className="p-2 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 rounded-xl hover:bg-brand-50 dark:hover:bg-brand-950/30 transition-colors cursor-pointer"
+                title="Start Video Call"
+              >
+                <Video className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+            </>
+          )}
+
+          {/* Group Info Action Button */}
+          {!isDirect && (
+            <button
+              type="button"
+              onClick={() => setIsGroupInfoOpen(true)}
+              className="p-2 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Group Info & Members"
+            >
+              <Info className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          )}
+
           {/* Quick Voice Lounge Button */}
           <button
             type="button"
             onClick={() => (isVoiceConnected ? undefined : joinVoiceRoom(title ? `Chat / ${title}` : undefined))}
-            className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+            className={`px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer ${
               isVoiceConnected
                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                 : 'text-slate-400 hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -450,7 +506,7 @@ export function ChatPane({ onBackMobile }: ChatPaneProps) {
             className="p-2 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             title="Chat Theme & Wallpaper"
           >
-            <Palette className="w-5 h-5" />
+            <Palette className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
 
           {/* Screen Share Feature Button */}
@@ -460,7 +516,7 @@ export function ChatPane({ onBackMobile }: ChatPaneProps) {
             className="p-2 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             title="Share Screen"
           >
-            <ScreenShare className="w-5 h-5" />
+            <ScreenShare className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </header>

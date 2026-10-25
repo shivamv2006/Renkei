@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { useDiscordVoice } from '@/context/discord-voice-context';
 import { Avatar } from '@/components/ui/Avatar';
+import { SoundboardModal } from './SoundboardModal';
 import {
   Wifi,
   PhoneOff,
@@ -69,6 +70,7 @@ export function DiscordVoicePanel({ onOpenSettings }: DiscordVoicePanelProps) {
   } = useDiscordVoice();
 
   const [showActivities, setShowActivities] = useState(false);
+  const [showSoundboard, setShowSoundboard] = useState(false);
   const [showMicMenu, setShowMicMenu] = useState(false);
   const [showHeadphonesMenu, setShowHeadphonesMenu] = useState(false);
 
@@ -95,6 +97,12 @@ export function DiscordVoicePanel({ onOpenSettings }: DiscordVoicePanelProps) {
 
   return (
     <div className="relative w-full bg-[#111214] dark:bg-[#111214] border-t border-slate-800/80 text-slate-200 select-none shrink-0 transition-all">
+      {/* Soundboard Modal with 12 Synthesized Audio SFX */}
+      <SoundboardModal
+        isOpen={showSoundboard}
+        onClose={() => setShowSoundboard(false)}
+      />
+
       {/* 0. Autoplay Sound Blocked Banner */}
       {autoplayBlocked && (
         <div
@@ -206,12 +214,12 @@ export function DiscordVoicePanel({ onOpenSettings }: DiscordVoicePanelProps) {
               <Gamepad2 className="w-4 h-4" />
             </button>
 
-            {/* Soundboard Chime Ping */}
+            {/* Soundboard FX Button */}
             <button
               type="button"
-              onClick={playSoundboardChime}
+              onClick={() => setShowSoundboard(true)}
               className="py-2 rounded-xl bg-[#2b2d31] hover:bg-[#35373c] text-slate-300 hover:text-amber-300 flex items-center justify-center transition-colors cursor-pointer"
-              title="Soundboard Chime"
+              title="Open Soundboard (12 Sounds)"
             >
               <Volume2 className="w-4 h-4" />
             </button>

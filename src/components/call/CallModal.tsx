@@ -40,6 +40,65 @@ export function CallModal() {
 
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
 
+  // Web Audio Ringtone for incoming & outgoing ringing states
+  useEffect(() => {
+    const isRinging = Boolean(
+      incomingCall ||
+      (activeCall && (activeCall.status === 'ringing' || activeCall.status === 'initiating'))
+    );
+
+    if (!isRinging) return;
+
+    let audioCtx: AudioContext | null = null;
+    let intervalId: any = null;
+
+    try {
+      const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtxClass) return;
+      audioCtx = new AudioCtxClass();
+
+      const playRingBurst = () => {
+        if (!audioCtx || audioCtx.state === 'closed') return;
+        const now = audioCtx.currentTime;
+
+        // Pleasant dual-tone phone ring (440Hz + 480Hz)
+        const osc1 = audioCtx.createOscillator();
+        const osc2 = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc1.frequency.setValueAtTime(440, now);
+        osc2.frequency.setValueAtTime(480, now);
+
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.setValueAtTime(0.08, now + 1.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.25);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 1.3);
+        osc2.stop(now + 1.3);
+      };
+
+      playRingBurst();
+      intervalId = setInterval(playRingBurst, 3000);
+    } catch (e) {
+      console.warn('[GENZOKU Call] Web Audio ringtone error:', e);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      if (audioCtx && audioCtx.state !== 'closed') {
+        try {
+          audioCtx.close();
+        } catch (e) {}
+      }
+    };
+  }, [incomingCall, activeCall?.status]);
+
   // Attach local video stream
   useEffect(() => {
     if (localVideoRef.current && localStream) {
@@ -100,7 +159,7 @@ export function CallModal() {
     const caller = incomingCall.caller_profile;
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in select-none">
-        <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center text-white shadow-2xl">
+        <div className="w-[calc(100vw-32px)] max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center text-white shadow-2xl">
           <div className="relative mx-auto mb-4 w-20 h-20 flex items-center justify-center">
             <span className="absolute inset-0 rounded-3xl bg-brand-500/30 animate-ping" />
             <Avatar src={caller?.avatar_url} name={caller?.display_name} size="xl" />
@@ -255,7 +314,7 @@ export function CallModal() {
       </div>
 
       {/* Floating Call Controls Bar */}
-      <div className="p-6 bg-slate-900/90 backdrop-blur-md flex justify-center items-center gap-4 border-t border-slate-800">
+      <div className="p-4 pb-8 sm:p-6 bg-slate-900/90 backdrop-blur-md flex justify-center items-center gap-3 sm:gap-4 border-t border-slate-800">
         <button
           onClick={toggleMute}
           className={`p-3.5 rounded-2xl transition-colors cursor-pointer ${

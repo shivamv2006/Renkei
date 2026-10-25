@@ -230,16 +230,16 @@ export function ThemeWallpaperModal({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
+      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col"
+        className="w-full max-w-lg max-h-[90dvh] bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col"
       >
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div className="px-4 py-3.5 sm:px-5 sm:py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-brand-500/10 dark:bg-brand-500/20 text-brand-600 dark:text-brand-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-brand-500/10 dark:bg-brand-500/20 text-brand-600 dark:text-brand-400 flex items-center justify-center shrink-0">
               <Palette className="w-4 h-4" />
             </div>
             <div>
@@ -260,31 +260,31 @@ export function ThemeWallpaperModal({
             type="button"
             onClick={onClose}
             title="Close Theme"
-            className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+            className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex border-b border-slate-200 dark:border-slate-800 text-xs font-semibold bg-slate-50/50 dark:bg-slate-950/30 overflow-x-auto">
+        <div className="flex border-b border-slate-200 dark:border-slate-800 text-xs font-semibold bg-slate-50/50 dark:bg-slate-950/30 overflow-x-auto no-scrollbar">
           {/* TAB 0: DIY Color Choice (User's main request) */}
           <button
             onClick={() => setActiveTab('diy_color')}
-            className={`flex-1 py-3 px-2 text-center border-b-2 flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 ${
+            className={`flex-1 py-3 px-3 text-center border-b-2 flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 ${
               activeTab === 'diy_color'
                 ? 'border-brand-500 text-brand-600 dark:text-brand-400 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
             <Paintbrush className="w-3.5 h-3.5" />
-            <span>DIY Color Picker</span>
+            <span>DIY Picker</span>
           </button>
 
           {/* TAB 1: App Gradient Presets */}
           <button
             onClick={() => setActiveTab('app_theme')}
-            className={`flex-1 py-3 px-2 text-center border-b-2 flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 ${
+            className={`flex-1 py-3 px-3 text-center border-b-2 flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 ${
               activeTab === 'app_theme'
                 ? 'border-brand-500 text-brand-600 dark:text-brand-400 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
@@ -297,32 +297,32 @@ export function ThemeWallpaperModal({
           {/* TAB 2: Chat Wallpaper */}
           <button
             onClick={() => setActiveTab('chat_wallpaper')}
-            className={`flex-1 py-3 px-2 text-center border-b-2 flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 ${
+            className={`flex-1 py-3 px-3 text-center border-b-2 flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 ${
               activeTab === 'chat_wallpaper'
                 ? 'border-brand-500 text-brand-600 dark:text-brand-400 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
             <MessageSquare className="w-3.5 h-3.5" />
-            <span>Chat Wallpaper</span>
+            <span>Chat Wallpapers</span>
           </button>
 
           {/* TAB 3: Media Upload */}
           <button
             onClick={() => setActiveTab('custom_image')}
-            className={`flex-1 py-3 px-2 text-center border-b-2 flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 ${
+            className={`flex-1 py-3 px-3 text-center border-b-2 flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 ${
               activeTab === 'custom_image'
                 ? 'border-brand-500 text-brand-600 dark:text-brand-400 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
             <Upload className="w-3.5 h-3.5" />
-            <span>Upload Image</span>
+            <span>Upload</span>
           </button>
         </div>
 
         {/* Tab Body */}
-        <div className="p-5 max-h-[420px] overflow-y-auto space-y-4">
+        <div className="p-4 sm:p-5 max-h-[calc(90dvh-130px)] overflow-y-auto space-y-4">
           {/* TAB 0: DIY CUSTOM COLOR PICKER (Option to choose custom colors) */}
           {activeTab === 'diy_color' && (
             <div className="space-y-4">
